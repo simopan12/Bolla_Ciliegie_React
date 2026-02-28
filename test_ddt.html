@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Test DDT</title>
+</head>
+<body>
+<script>
+// ── Dati fissi ──────────────────────────────────────
+const MITTENTE = {
+  nome: "MITTENTE_NOME",
+  via: "MITTENTE_VIA",
+  cap: "41058",
+  citta: "Vignola",
+  prov: "MO",
+  email: "MITTENTE_EMAIL",
+  piva: "MITTENTE_PIVA",
+  cf: "MITTENTE_CF",
+  tel: "MITTENTE_TEL",
+};
+
+const DESTINATARIO = {
+  nome: "DESTINATARIO_NOME",
+  sub: "A SOCIO UNICO",
+  via: "DESTINATARIO_VIA",
+  cap: "41058",
+  citta: "Vignola",
+  prov: "MO",
+  piva: "DESTINATARIO_PIVA",
+  sdi: "DESTINATARIO_SDI",
+  tel: "DESTINATARIO_TEL",
+};
+
+const SPECIAL_VARIETIES = ["Rossi", "Piccoli", "Scarti"];
+
+// ── Helpers ─────────────────────────────────────────
+function h(s) {
+  if (!s && s !== 0) return "";
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+function n(val, d = 2) {
+  if (val == null || isNaN(Number(val))) return "";
+  return Number(val).toFixed(d).replace(".", ",");
+}
+function kg(val) {
+  if (val == null || isNaN(Number(val))) return "";
+  const num = Number(val);
+  const isInt = Math.abs(num - Math.round(num)) < 1e-9;
+  return isInt ? String(Math.round(num)) : n(num, 2);
+}
+function isSpecial(variety) { return SPECIAL_VARIETIES.includes(variety); }
+function formatDate(s) {
+  if (!s) return "";
+  const d = new Date(s);
+  return d.toLocaleDateString("it-IT", { day:"2-digit", month:"2-digit", year:"numeric" });
+}
+function formatDateTime(s) {
+  if (!s) return "";
+  const d = new Date(s);
+  return d.toLocaleString("it-IT", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" });
+}
+
+// ── Dati di test ─────────────────────────────────────
+const bolla = {
+  progressiveNumber: 7,
+  emissionDate: "2026-06-15",
+  pickupDatetime: "2026-06-15T07:30",
+  state: "NON_STAMPATA",
+  notes: "Nota di prova",
+  righe: [
+    { variety: "Bigarreaux",   harvestDate: "2026-06-14", numPadelle: 4,  kg: 12 },
+    { variety: "Ferrovia",     harvestDate: "2026-06-13", numPadelle: 6,  kg: 18 },
+    { variety: "Cristallina",  harvestDate: "2026-06-12", numPadelle: 3,  kg: 9  },
+    { variety: "Rossi",        harvestDate: null,          numPadelle: 2,  kg: 0  },
+  ],
+};
+
+// ── Build content ────────────────────────────────────
+function buildContent(bolla) {
+  const righe = bolla.righe || [];
+  const numStr = String(bolla.progressiveNumber).padStart(4, "0");
+  const dataDDT = formatDate(bolla.emissionDate);
+  const pickup = bolla.pickupDatetime ? formatDateTime(bolla.pickupDatetime) : "";
+  const isPostSale = bolla.state !== "NON_STAMPATA";
+
+  const prodRows = righe.map((r) => {
+    const spec = isSpecial(r.variety);
+    const padelle = r.numPadelle ?? "";
+    const showKg = !spec || (spec && isPostSale && Number(r.kg) > 0);
+    const kgCell = showKg ? `KG ${kg(r.kg)}` : "";
+    const descCell = spec
+      ? h(r.variety)
+      : `Padelle duroni ${h(r.variety)} Prodotto destinato all'IGP${r.harvestDate ? ` Data raccolta ${formatDate(r.harvestDate)}` : ""}`;
+
+    return `
+      <tr>
+        <td class="col-pad">${h(padelle)}</td>
+        <td class="col-desc">${descCell}</td>
+        <td class="col-qty">${kgCell}</td>
+      </tr>`;
+  }).join("");
+
+  const stdKg = righe.filter(r => !isSpecial(r.variety)).reduce((s,r) => s + (Number(r.kg)||0), 0);
+  const specKg = righe.filter(r => isSpecial(r.variety)).reduce((s,r) => s + (Number(r.kg)||0), 0);
+  const totalKg = isPostSale ? stdKg + specKg : stdKg;
+  const totalKgValue = isPostSale || specKg === 0 ? `${kg(totalKg)}` : `${kg(stdKg)} *`;
+  const totalPadelle = righe.reduce((s,r) => s + (Number(r.numPadelle)||0), 0);
+
+  return `
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#000;background:#fff}
+.ddt-page{width:185mm;margin:0 auto;padding:8mm 0 4mm}
+@media print{.ddt-page{padding:0;width:100%}@page{size:A4 portrait;margin:10mm 12mm}}
+.ddt-header{background:#000;color:#fff;text-align:center;padding:8px 10px;font-size:14pt;font-weight:bold;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
+.two-col{display:flex;gap:5px;margin-bottom:5px}
+.col-left{flex:1.2}
+.col-right{flex:0.8;display:flex;flex-direction:column;gap:5px}
+.box{border:1px solid #000;font-size:9pt;line-height:1.6;padding:5px 7px}
+.box-title{font-weight:bold;font-size:9.5pt;text-transform:uppercase;margin-bottom:3px;border-bottom:1px solid #000;padding-bottom:2px}
+.doc-box{font-size:9pt;padding:5px 7px}
+.doc-box .doc-title{font-weight:bold;text-align:center;font-size:10pt;text-transform:uppercase;margin-bottom:4px}
+.doc-inline{display:flex;align-items:baseline;gap:10px;font-weight:bold;font-size:9.5pt}
+.causale-box{display:flex;border:1px solid #000;margin-bottom:5px}
+.caus-cell{flex:1;padding:4px 7px;font-size:9pt;line-height:1.8}
+.caus-cell+.caus-cell{border-left:1px solid #000}
+.prod-table{width:100%;border-collapse:collapse;margin-bottom:5px;font-size:9pt}
+.prod-table th{background:#e0e0e0;border:1px solid #000;padding:4px 6px;font-weight:bold;font-size:9pt}
+.th-l{text-align:left}.th-c{text-align:center}.th-r{text-align:right}
+.prod-table td{border:1px solid #000;padding:3px 6px}
+.col-pad{width:12%;text-align:center}
+.col-desc{width:73%;text-align:left}
+.col-qty{width:15%;text-align:right}
+.tot-row td{font-weight:bold;font-size:10pt;background:#f4f4f4;padding:4px 6px;border:1px solid #000}
+.tot-cell{text-align:right;font-weight:bold}
+.info-row{display:flex;gap:5px;margin-bottom:5px}
+.info-box{flex:1;border:1px solid #000;padding:4px 7px;font-size:9pt;min-height:14mm}
+.info-box-title{font-weight:bold;font-size:8.5pt;text-transform:uppercase;margin-bottom:2px}
+.note-box{border:1px solid #000;padding:5px 7px;margin-bottom:5px;min-height:50mm;font-size:9pt}
+.note-title{font-weight:bold;margin-bottom:4px}
+.firma-row{display:flex;gap:5px}
+.firma-box{flex:1;border:1px solid #000;padding:5px 7px;min-height:28mm;font-size:9pt}
+.firma-title{font-weight:bold;text-transform:uppercase;font-size:9pt}
+</style>
+
+<div class="ddt-page">
+  <div class="ddt-header">Documento di Trasporto</div>
+  <div class="two-col">
+    <div class="col-left">
+      <div class="box" style="height:100%">
+        <div class="box-title">Mittente</div>
+        <div><strong>${h(MITTENTE.nome)}</strong></div>
+        <div>${h(MITTENTE.via)}</div>
+        <div>${h(MITTENTE.cap)} ${h(MITTENTE.citta)} (${h(MITTENTE.prov)})</div>
+        <div><strong>Email:</strong> ${h(MITTENTE.email)}</div>
+        <div><strong>P.IVA:</strong> ${h(MITTENTE.piva)}</div>
+        <div><strong>C.F.:</strong> ${h(MITTENTE.cf)}</div>
+        <div><strong>Tel:</strong> ${h(MITTENTE.tel)}</div>
+      </div>
+    </div>
+    <div class="col-right">
+      <div class="box doc-box">
+        <div class="doc-title">Documento di Trasporto</div>
+        <div class="doc-inline">
+          <span>N.:</span>
+          <span>${numStr}</span>
+          <span>${dataDDT}</span>
+        </div>
+      </div>
+      <div class="box" style="flex:1">
+        <div class="box-title">Destinatario</div>
+        <div><strong>${h(DESTINATARIO.nome)}</strong></div>
+        ${DESTINATARIO.sub ? `<div>${h(DESTINATARIO.sub)}</div>` : ""}
+        <div>${h(DESTINATARIO.via)}</div>
+        <div>${h(DESTINATARIO.cap)} ${h(DESTINATARIO.citta)} (${h(DESTINATARIO.prov)})</div>
+        <div><strong>P.IVA:</strong> ${h(DESTINATARIO.piva)}</div>
+        <div><strong>Cod. SDI:</strong> ${h(DESTINATARIO.sdi)}</div>
+        <div><strong>Tel:</strong> ${h(DESTINATARIO.tel)}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="causale-box">
+    <div class="caus-cell">Causale del Trasporto: <strong>VENDITA</strong></div>
+    <div class="caus-cell">Mezzo di Trasporto: <strong>MITTENTE</strong></div>
+  </div>
+
+  <table class="prod-table">
+    <thead>
+      <tr>
+        <th class="th-c">N&#176; padelle</th>
+        <th class="th-l">Descrizione dei Beni</th>
+        <th class="th-r">Quantit&#224;</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${prodRows}
+      <tr class="tot-row">
+        <td colspan="2"></td>
+        <td class="tot-cell">TOTALE KG ${h(totalKgValue)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="info-row">
+    <div class="info-box">
+      <div class="info-box-title">Luogo di Destinazione</div>
+      <div>Sede del Destinatario</div>
+    </div>
+    <div class="info-box">
+      <div class="info-box-title">Trasporto a Mezzo</div>
+      <div>Mittente</div>
+    </div>
+  </div>
+
+  <div class="info-row">
+    <div class="info-box" style="flex:2">
+      <div class="info-box-title">Data e Ora Ritiro</div>
+      <div>${h(pickup)}</div>
+    </div>
+    <div class="info-box" style="flex:1">
+      <div class="info-box-title">N&#176; Colli</div>
+      <div>${totalPadelle > 0 ? totalPadelle : ""}</div>
+    </div>
+  </div>
+
+  <div class="note-box">
+    <div class="note-title">Annotazioni:</div>
+    <div>${bolla.notes ? h(bolla.notes) : ""}</div>
+  </div>
+
+  <div class="firma-row">
+    <div class="firma-box"><div class="firma-title">Firma Mittente</div></div>
+    <div class="firma-box"><div class="firma-title">Firma Destinatario</div></div>
+  </div>
+</div>`;
+}
+
+document.body.innerHTML = buildContent(bolla);
+</script>
+</body>
+</html>

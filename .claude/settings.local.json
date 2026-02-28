@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node:*)",
+      "Bash(cmd.exe:*)",
+      "Bash(powershell.exe:*)",
+      "Bash(export:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(winget:*)",
+      "Bash(gcc:*)",
+      "Bash(curl:*)",
+      "Bash(RUSTUP_HOME=\"/c/Users/Utente/.rustup\" CARGO_HOME=\"/c/Users/Utente/.cargo\" /tmp/rustup-init.exe:*)",
+      "Bash(convert:*)",
+      "Bash(python3:*)",
+      "Bash(cargo:*)"
+    ]
+  }
+}

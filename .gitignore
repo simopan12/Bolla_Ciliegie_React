@@ -1,0 +1,13 @@
+# Node
+node_modules/
+dist/
+dist-sse/
+
+# Tauri
+src-tauri/target/
+src-tauri/gen/
+
+# Misc
+.DS_Store
+*.env
+*.local
