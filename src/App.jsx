@@ -7,6 +7,7 @@ import Dipendenti from "./components/Dipendenti";
 import Costi from "./components/Costi";
 import Dashboard from "./components/Dashboard";
 import Clienti from "./components/Clienti";
+import Giornale from "./components/Giornale";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
             <Route path="/costi"         element={<Costi />} />
             <Route path="/dashboard"     element={<Dashboard />} />
             <Route path="/clienti"       element={<Clienti />} />
+            <Route path="/giornale"      element={<Giornale />} />
           </Routes>
         </main>
       </div>

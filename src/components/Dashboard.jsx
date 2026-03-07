@@ -139,7 +139,7 @@ export default function Dashboard() {
         </select>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards — riga 1: valori assoluti */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KPICard
           label="Ricavi"
@@ -165,6 +165,27 @@ export default function Dashboard() {
           trendVal={kgPct}
         />
       </div>
+
+      {/* KPI Cards — riga 2: per kg */}
+      {current && current.kgTotali > 0 && (
+        <div className="grid grid-cols-3 gap-4">
+          <KPICard
+            label="Costo manodopera / kg"
+            value={"€ " + (current.costiManodopera / current.kgTotali).toFixed(3)}
+            sub="costo raccolta per ogni kg venduto"
+          />
+          <KPICard
+            label="Prezzo medio / kg"
+            value={"€ " + (current.ricavi / current.kgTotali).toFixed(3)}
+            sub="ricavo medio per ogni kg venduto"
+          />
+          <KPICard
+            label="Margine / kg"
+            value={"€ " + (current.margine / current.kgTotali).toFixed(3)}
+            sub="margine netto per ogni kg venduto"
+          />
+        </div>
+      )}
 
       {/* Area Chart */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">

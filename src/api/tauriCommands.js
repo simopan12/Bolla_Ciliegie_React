@@ -52,3 +52,9 @@ export const setClientePredefinito = (id) => invoke("set_cliente_predefinito", {
 
 // ── Yearly Stats ──────────────────────────────────────
 export const getYearlyStats = (years) => invoke("get_yearly_stats", { years });
+
+// ── Giornale di Raccolta ───────────────────────────────
+export const getGiornale = (year) => invoke("get_giornale", { year: year ?? null });
+export const createGiornaleEntry = (payload) => invoke("create_giornale_entry", { payload });
+export const updateGiornaleEntry = (id, payload) => invoke("update_giornale_entry", { id, payload });
+export const deleteGiornaleEntry = (id) => invoke("delete_giornale_entry", { id });

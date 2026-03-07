@@ -247,6 +247,27 @@ pub struct VarietaStats {
     pub kg: f64,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct GiornaleEntry {
+    pub id: i64,
+    pub data: String,
+    pub varieta: String,
+    pub stato_lotto: String,
+    pub calibro_stimato: Option<String>,
+    pub note: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GiornalePayload {
+    pub data: String,
+    pub varieta: String,
+    pub stato_lotto: String,
+    pub calibro_stimato: Option<String>,
+    pub note: Option<String>,
+}
+
 // ─────────────────────────────────────────────
 // DB init + migration
 // ─────────────────────────────────────────────
@@ -336,6 +357,15 @@ pub fn init_db(conn: &Connection) -> rusqlite::Result<()> {
             sdi         TEXT,
             predefinito INTEGER DEFAULT 0,
             attivo      INTEGER DEFAULT 1
+        );
+
+        CREATE TABLE IF NOT EXISTS giornale_raccolta (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            data            DATE NOT NULL,
+            varieta         TEXT NOT NULL,
+            stato_lotto     TEXT NOT NULL DEFAULT 'NON_PRONTO',
+            calibro_stimato TEXT,
+            note            TEXT
         );
         ",
     )?;
@@ -1256,6 +1286,115 @@ mod commands {
 
         Ok(result)
     }
+
+    // ── Giornale di Raccolta ─────────────────────────
+
+    #[tauri::command]
+    pub fn get_giornale(state: State<DbState>, year: Option<i64>) -> Result<Vec<GiornaleEntry>, String> {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        let rows: Vec<GiornaleEntry> = if let Some(y) = year {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT id, data, varieta, stato_lotto, calibro_stimato, note
+                     FROM giornale_raccolta
+                     WHERE CAST(strftime('%Y', data) AS INT) = ?1
+                     ORDER BY data DESC",
+                )
+                .map_err(|e| e.to_string())?;
+            let collected: Vec<GiornaleEntry> = stmt
+                .query_map([y], |r| {
+                    Ok(GiornaleEntry {
+                        id: r.get(0)?,
+                        data: r.get(1)?,
+                        varieta: r.get(2)?,
+                        stato_lotto: r.get(3)?,
+                        calibro_stimato: r.get(4)?,
+                        note: r.get(5)?,
+                    })
+                })
+                .map_err(|e| e.to_string())?
+                .filter_map(|r| r.ok())
+                .collect();
+            collected
+        } else {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT id, data, varieta, stato_lotto, calibro_stimato, note
+                     FROM giornale_raccolta
+                     ORDER BY data DESC",
+                )
+                .map_err(|e| e.to_string())?;
+            let collected: Vec<GiornaleEntry> = stmt
+                .query_map([], |r| {
+                    Ok(GiornaleEntry {
+                        id: r.get(0)?,
+                        data: r.get(1)?,
+                        varieta: r.get(2)?,
+                        stato_lotto: r.get(3)?,
+                        calibro_stimato: r.get(4)?,
+                        note: r.get(5)?,
+                    })
+                })
+                .map_err(|e| e.to_string())?
+                .filter_map(|r| r.ok())
+                .collect();
+            collected
+        };
+        Ok(rows)
+    }
+
+    #[tauri::command]
+    pub fn create_giornale_entry(
+        state: State<DbState>,
+        payload: GiornalePayload,
+    ) -> Result<i64, String> {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        conn.execute(
+            "INSERT INTO giornale_raccolta (data, varieta, stato_lotto, calibro_stimato, note)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                payload.data,
+                payload.varieta,
+                payload.stato_lotto,
+                payload.calibro_stimato,
+                payload.note
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    #[tauri::command]
+    pub fn update_giornale_entry(
+        state: State<DbState>,
+        id: i64,
+        payload: GiornalePayload,
+    ) -> Result<(), String> {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE giornale_raccolta
+             SET data=?1, varieta=?2, stato_lotto=?3, calibro_stimato=?4, note=?5
+             WHERE id=?6",
+            params![
+                payload.data,
+                payload.varieta,
+                payload.stato_lotto,
+                payload.calibro_stimato,
+                payload.note,
+                id
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    #[tauri::command]
+    pub fn delete_giornale_entry(state: State<DbState>, id: i64) -> Result<(), String> {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM giornale_raccolta WHERE id=?1", [id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
 }
 
 // ─────────────────────────────────────────────
@@ -1310,6 +1449,10 @@ pub fn run() {
             commands::delete_cliente,
             commands::set_cliente_predefinito,
             commands::get_yearly_stats,
+            commands::get_giornale,
+            commands::create_giornale_entry,
+            commands::update_giornale_entry,
+            commands::delete_giornale_entry,
         ])
         .run(tauri::generate_context!())
         .expect("errore durante l'avvio dell'applicazione");

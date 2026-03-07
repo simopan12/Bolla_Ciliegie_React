@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { List, Plus, BarChart2, Users, Wallet, LayoutDashboard, Building2 } from "lucide-react";
+import { List, Plus, BarChart2, Users, Wallet, LayoutDashboard, Building2, BookOpen } from "lucide-react";
 
 const links = [
   { to: "/", label: "Elenco Bolle", icon: List },
@@ -7,6 +7,7 @@ const links = [
   { to: "/report", label: "Report Vendite", icon: BarChart2 },
   { to: "/dipendenti", label: "Dipendenti", icon: Users },
   { to: "/costi", label: "Costi", icon: Wallet },
+  { to: "/giornale", label: "Giornale", icon: BookOpen },
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/clienti", label: "Clienti", icon: Building2 },
 ];
