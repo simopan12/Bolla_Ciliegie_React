@@ -8,6 +8,7 @@ import Costi from "./components/Costi";
 import Dashboard from "./components/Dashboard";
 import Clienti from "./components/Clienti";
 import Giornale from "./components/Giornale";
+import ImpostazioniBolla from "./components/ImpostazioniBolla";
 
 export default function App() {
   return (
@@ -16,15 +17,16 @@ export default function App() {
         <Navbar />
         <main className="flex-1 container mx-auto px-4 py-6 max-w-5xl">
           <Routes>
-            <Route path="/"              element={<BolleList />} />
-            <Route path="/nuova"         element={<BollaForm />} />
-            <Route path="/modifica/:id"  element={<BollaForm />} />
-            <Route path="/report"        element={<Report />} />
-            <Route path="/dipendenti"    element={<Dipendenti />} />
-            <Route path="/costi"         element={<Costi />} />
-            <Route path="/dashboard"     element={<Dashboard />} />
-            <Route path="/clienti"       element={<Clienti />} />
-            <Route path="/giornale"      element={<Giornale />} />
+            <Route path="/"                   element={<BolleList />} />
+            <Route path="/nuova"              element={<BollaForm />} />
+            <Route path="/modifica/:id"       element={<BollaForm />} />
+            <Route path="/impostazioni-bolla" element={<ImpostazioniBolla />} />
+            <Route path="/report"             element={<Report />} />
+            <Route path="/dipendenti"         element={<Dipendenti />} />
+            <Route path="/costi"              element={<Costi />} />
+            <Route path="/dashboard"          element={<Dashboard />} />
+            <Route path="/clienti"            element={<Clienti />} />
+            <Route path="/giornale"           element={<Giornale />} />
           </Routes>
         </main>
       </div>

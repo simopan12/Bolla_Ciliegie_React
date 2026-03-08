@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, Trash2, Save, ArrowLeft, RefreshCw, AlertCircle } from "lucide-react";
-import { createBolla, updateBolla, getBolla, getClienti } from "../api/tauriCommands";
+import { createBolla, updateBolla, getBolla, getClienti, getMittenti } from "../api/tauriCommands";
 import { todayISO } from "../utils/formatters";
 
 // ─────────────────────────────────────────────
@@ -164,18 +164,34 @@ export default function BollaForm() {
   const [notes,          setNotes]          = useState("");
   const [clienteId,      setClienteId]      = useState(null);
   const [clienti,        setClienti]        = useState([]);
+  const [mittenteId,     setMittenteId]     = useState(null);
+  const [mittenti,       setMittenti]       = useState([]);
   const [errors,         setErrors]         = useState({});
   const [saving,         setSaving]         = useState(false);
   const [loadingEdit,    setLoadingEdit]    = useState(isEdit);
   const [loadError,      setLoadError]      = useState(null);
 
-  // ── Load clienti ──────────────────────────────────────────────
+  // ── Load clienti + mittenti ───────────────────────────────────
   useEffect(() => {
     getClienti().then((list) => {
       setClienti(list);
       if (!isEdit) {
-        const def = list.find((c) => c.predefinito === 1);
-        if (def) setClienteId(def.id);
+        const lastId = parseInt(localStorage.getItem("bolla_last_cliente_id") ?? "0");
+        const last   = list.find((c) => c.id === lastId);
+        const def    = list.find((c) => c.predefinito === 1);
+        if (last) setClienteId(last.id);
+        else if (def) setClienteId(def.id);
+      }
+    });
+    getMittenti().then((list) => {
+      setMittenti(list);
+      if (!isEdit) {
+        const lastId = parseInt(localStorage.getItem("bolla_last_mittente_id") ?? "0");
+        const last   = list.find((m) => m.id === lastId);
+        const def    = list.find((m) => m.predefinito === 1);
+        if (last) setMittenteId(last.id);
+        else if (def) setMittenteId(def.id);
+        else if (list.length > 0) setMittenteId(list[0].id);
       }
     });
   }, [isEdit]);
@@ -189,6 +205,7 @@ export default function BollaForm() {
         setPickupDatetime(b.pickupDatetime ? b.pickupDatetime.slice(0, 16) : "");
         setNotes(b.notes ?? "");
         setClienteId(b.clienteId ?? null);
+        setMittenteId(b.mittenteId ?? null);
 
         const std  = b.righe.filter((r) => !SPECIAL_VARIETIES.includes(r.variety));
         const spec = b.righe.filter((r) => SPECIAL_VARIETIES.includes(r.variety));
@@ -268,10 +285,15 @@ export default function BollaForm() {
     }
     setSaving(true);
 
+    // Ricorda gli ultimi usati
+    if (clienteId)   localStorage.setItem("bolla_last_cliente_id",   String(clienteId));
+    if (mittenteId)  localStorage.setItem("bolla_last_mittente_id",  String(mittenteId));
+
     const payload = {
       pickupDatetime: pickupDatetime || null,
       notes: notes.trim() || null,
-      clienteId: clienteId ?? null,
+      clienteId:   clienteId   ?? null,
+      mittenteId:  mittenteId  ?? null,
       righe: [
         ...stdRows.map((r) => ({
           variety:     r.variety,
@@ -343,10 +365,38 @@ export default function BollaForm() {
           </div>
         )}
 
-        {/* ── Cliente ───────────────────────────────────────────── */}
-        {clienti.length > 0 && (
-          <div className="card p-5">
-            <label className="label">Cliente</label>
+        {/* ── Mittente + Destinatario ───────────────────────────── */}
+        <div className="card p-5 space-y-4">
+          {/* Mittente */}
+          <div className="space-y-1">
+            <label className="label">Mittente</label>
+            <select
+              className="input"
+              value={mittenteId ?? ""}
+              onChange={(e) => setMittenteId(e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">— Nessun mittente —</option>
+              {mittenti.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nome}{m.predefinito === 1 ? " (predefinito)" : ""}
+                </option>
+              ))}
+            </select>
+            {mittenti.find((m) => m.id === mittenteId) && (() => {
+              const m = mittenti.find((x) => x.id === mittenteId);
+              return (
+                <div className="px-3 py-2 bg-gray-50 rounded-lg text-xs text-gray-500 space-y-0.5">
+                  {m.via   && <div>{m.via}</div>}
+                  {m.citta && <div>{[m.cap, m.citta, m.prov ? `(${m.prov})` : ""].filter(Boolean).join(" ")}</div>}
+                  {m.piva  && <div>P.IVA: {m.piva}</div>}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Cliente / Destinatario */}
+          <div className="space-y-1">
+            <label className="label">Cliente / Destinatario</label>
             <select
               className="input"
               value={clienteId ?? ""}
@@ -359,8 +409,18 @@ export default function BollaForm() {
                 </option>
               ))}
             </select>
+            {clienti.find((c) => c.id === clienteId) && (() => {
+              const c = clienti.find((x) => x.id === clienteId);
+              return (
+                <div className="px-3 py-2 bg-gray-50 rounded-lg text-xs text-gray-500 space-y-0.5">
+                  {c.via   && <div>{c.via}</div>}
+                  {c.citta && <div>{[c.cap, c.citta, c.prov ? `(${c.prov})` : ""].filter(Boolean).join(" ")}</div>}
+                  {c.piva  && <div>P.IVA: {c.piva}</div>}
+                </div>
+              );
+            })()}
           </div>
-        )}
+        </div>
 
         {/* ── Pickup datetime ────────────────────────────────────── */}
         <div className="card p-5">

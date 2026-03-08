@@ -50,6 +50,13 @@ export const updateCliente = (id, payload) => invoke("update_cliente", { id, pay
 export const deleteCliente = (id) => invoke("delete_cliente", { id });
 export const setClientePredefinito = (id) => invoke("set_cliente_predefinito", { id });
 
+// ── Mittenti ──────────────────────────────────────────
+export const getMittenti = () => invoke("get_mittenti");
+export const createMittente = (payload) => invoke("create_mittente", { payload });
+export const updateMittente = (id, payload) => invoke("update_mittente", { id, payload });
+export const deleteMittente = (id) => invoke("delete_mittente", { id });
+export const setMittentePredefinito = (id) => invoke("set_mittente_predefinito", { id });
+
 // ── Yearly Stats ──────────────────────────────────────
 export const getYearlyStats = (years) => invoke("get_yearly_stats", { years });
 

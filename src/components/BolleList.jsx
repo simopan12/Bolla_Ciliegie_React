@@ -2,14 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Printer, DollarSign, Pencil, Trash2,
-  RefreshCw, AlertCircle, Plus, Check, Settings,
+  RefreshCw, AlertCircle, Plus, Check,
 } from "lucide-react";
 import { getBolle, deleteBolla, confirmBolla } from "../api/tauriCommands";
 import { generateDDT } from "../utils/generateDDT";
 import { formatDate, formatKg, formatEuro } from "../utils/formatters";
 import PriceModal from "./PriceModal";
 import ConfirmDialog from "./ConfirmDialog";
-import PdfSettingsPanel from "./PdfSettingsPanel";
 
 // ── Stats bar ───────────────────────────────────────────────────
 function StatsBar({ bolle }) {
@@ -78,7 +77,6 @@ export default function BolleList() {
   const [priceModalBolla, setPriceModalBolla] = useState(null);
 
   // PDF settings panel
-  const [showPdfSettings, setShowPdfSettings] = useState(false);
 
   // Delete confirm
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -145,14 +143,6 @@ export default function BolleList() {
           <button className="btn-secondary btn-sm" onClick={load} disabled={loading}>
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
             Aggiorna
-          </button>
-          <button
-            className="btn-secondary btn-sm"
-            onClick={() => setShowPdfSettings(true)}
-            title="Configura i dati fissi del DDT (Mittente e Destinatario)"
-          >
-            <Settings size={14} />
-            Impostazioni DDT
           </button>
           <button className="btn-primary" onClick={() => navigate("/nuova")}>
             <Plus size={15} />
@@ -397,10 +387,6 @@ export default function BolleList() {
         </div>
       )}
 
-      {/* PDF Settings Panel */}
-      {showPdfSettings && (
-        <PdfSettingsPanel onClose={() => setShowPdfSettings(false)} />
-      )}
     </div>
   );
 }

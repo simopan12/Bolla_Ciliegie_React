@@ -353,8 +353,9 @@ export default function Dipendenti() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="label">Costo orario €/h *</label>
+                  <label className="label">Costo orario €/h</label>
                   <input className="input" type="number" step="0.01" min="0" required value={presForm.costoOrario} onChange={(e) => setPresForm({ ...presForm, costoOrario: e.target.value })} />
+                  <p className="text-xs text-gray-400 mt-0.5">Ereditato dal dipendente</p>
                 </div>
                 <div>
                   <label className="label">Tipo lavoro</label>

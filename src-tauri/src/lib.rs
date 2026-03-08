@@ -56,6 +56,52 @@ pub struct ClientePayload {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct Mittente {
+    pub id:          i64,
+    pub nome:        String,
+    pub via:         Option<String>,
+    pub cap:         Option<String>,
+    pub citta:       Option<String>,
+    pub prov:        Option<String>,
+    pub piva:        Option<String>,
+    pub cf:          Option<String>,
+    pub tel:         Option<String>,
+    pub email:       Option<String>,
+    pub predefinito: i64,
+    pub attivo:      i64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct MittentePayload {
+    pub nome:  String,
+    pub via:   Option<String>,
+    pub cap:   Option<String>,
+    pub citta: Option<String>,
+    pub prov:  Option<String>,
+    pub piva:  Option<String>,
+    pub cf:    Option<String>,
+    pub tel:   Option<String>,
+    pub email: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct MittenteDDT {
+    pub id:    i64,
+    pub nome:  String,
+    pub via:   Option<String>,
+    pub cap:   Option<String>,
+    pub citta: Option<String>,
+    pub prov:  Option<String>,
+    pub piva:  Option<String>,
+    pub cf:    Option<String>,
+    pub tel:   Option<String>,
+    pub email: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ClienteDDT {
     pub id: i64,
     pub nome: String,
@@ -82,6 +128,8 @@ pub struct Bolla {
     pub state: String,
     pub cliente_id: Option<i64>,
     pub cliente: Option<ClienteDDT>,
+    pub mittente_id: Option<i64>,
+    pub mittente: Option<MittenteDDT>,
     pub righe: Vec<RigaBolla>,
     pub total_kg: f64,
     pub total_revenue: f64,
@@ -103,6 +151,7 @@ pub struct CreateBollaPayload {
     pub notes: Option<String>,
     pub righe: Vec<RigaInput>,
     pub cliente_id: Option<i64>,
+    pub mittente_id: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -112,6 +161,7 @@ pub struct UpdateBollaPayload {
     pub notes: Option<String>,
     pub righe: Vec<RigaInput>,
     pub cliente_id: Option<i64>,
+    pub mittente_id: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -359,6 +409,21 @@ pub fn init_db(conn: &Connection) -> rusqlite::Result<()> {
             attivo      INTEGER DEFAULT 1
         );
 
+        CREATE TABLE IF NOT EXISTS mittenti (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome        TEXT NOT NULL,
+            via         TEXT,
+            cap         TEXT,
+            citta       TEXT,
+            prov        TEXT,
+            piva        TEXT,
+            cf          TEXT,
+            tel         TEXT,
+            email       TEXT,
+            predefinito INTEGER DEFAULT 0,
+            attivo      INTEGER DEFAULT 1
+        );
+
         CREATE TABLE IF NOT EXISTS giornale_raccolta (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
             data            DATE NOT NULL,
@@ -393,6 +458,47 @@ pub fn init_db(conn: &Connection) -> rusqlite::Result<()> {
     let _ = conn.execute("ALTER TABLE clienti ADD COLUMN piva TEXT", []);
     let _ = conn.execute("ALTER TABLE clienti ADD COLUMN tel TEXT", []);
     let _ = conn.execute("ALTER TABLE clienti ADD COLUMN sdi TEXT", []);
+
+    // Migrazione mittente_id e snap mittente per bolla
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN mittente_id INTEGER REFERENCES mittenti(id)", []);
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN snap_mit_nome  TEXT", []);
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN snap_mit_via   TEXT", []);
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN snap_mit_cap   TEXT", []);
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN snap_mit_citta TEXT", []);
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN snap_mit_prov  TEXT", []);
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN snap_mit_piva  TEXT", []);
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN snap_mit_cf    TEXT", []);
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN snap_mit_tel   TEXT", []);
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN snap_mit_email TEXT", []);
+
+    // Vecchio campo mittente_override (mantenuto per backward compat, non più scritto)
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN mittente_override TEXT", []);
+
+    // Migrazione snapshot destinatario nella bolla (safe to ignore if already exist)
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN snap_nome  TEXT", []);
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN snap_sub   TEXT", []);
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN snap_via   TEXT", []);
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN snap_cap   TEXT", []);
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN snap_citta TEXT", []);
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN snap_prov  TEXT", []);
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN snap_piva  TEXT", []);
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN snap_tel   TEXT", []);
+    let _ = conn.execute("ALTER TABLE bolle ADD COLUMN snap_sdi   TEXT", []);
+
+    // Backfill snapshot per bolle esistenti che ancora non ce l'hanno
+    let _ = conn.execute_batch(
+        "UPDATE bolle SET
+           snap_nome  = (SELECT nome  FROM clienti WHERE clienti.id = bolle.cliente_id),
+           snap_sub   = (SELECT sub   FROM clienti WHERE clienti.id = bolle.cliente_id),
+           snap_via   = (SELECT via   FROM clienti WHERE clienti.id = bolle.cliente_id),
+           snap_cap   = (SELECT cap   FROM clienti WHERE clienti.id = bolle.cliente_id),
+           snap_citta = (SELECT citta FROM clienti WHERE clienti.id = bolle.cliente_id),
+           snap_prov  = (SELECT prov  FROM clienti WHERE clienti.id = bolle.cliente_id),
+           snap_piva  = (SELECT piva  FROM clienti WHERE clienti.id = bolle.cliente_id),
+           snap_tel   = (SELECT tel   FROM clienti WHERE clienti.id = bolle.cliente_id),
+           snap_sdi   = (SELECT sdi   FROM clienti WHERE clienti.id = bolle.cliente_id)
+         WHERE cliente_id IS NOT NULL AND snap_nome IS NULL;",
+    );
 
     // Seed cliente predefinito (Azzani) se non esiste
     let _ = conn.execute(
@@ -437,17 +543,39 @@ fn load_bolla(conn: &Connection, id: i64) -> rusqlite::Result<Bolla> {
         "SELECT b.id, b.progressive_number, b.emission_date, b.print_timestamp,
                 b.closing_timestamp, b.pickup_datetime, b.notes, b.state,
                 b.cliente_id,
-                c.nome, c.sub, c.via, c.cap, c.citta, c.prov, c.piva, c.tel, c.sdi
+                COALESCE(b.snap_nome,  c.nome)  AS snap_nome,
+                COALESCE(b.snap_sub,   c.sub)   AS snap_sub,
+                COALESCE(b.snap_via,   c.via)   AS snap_via,
+                COALESCE(b.snap_cap,   c.cap)   AS snap_cap,
+                COALESCE(b.snap_citta, c.citta) AS snap_citta,
+                COALESCE(b.snap_prov,  c.prov)  AS snap_prov,
+                COALESCE(b.snap_piva,  c.piva)  AS snap_piva,
+                COALESCE(b.snap_tel,   c.tel)   AS snap_tel,
+                COALESCE(b.snap_sdi,   c.sdi)   AS snap_sdi,
+                b.mittente_id,
+                COALESCE(b.snap_mit_nome,  m.nome)  AS snap_mit_nome,
+                COALESCE(b.snap_mit_via,   m.via)   AS snap_mit_via,
+                COALESCE(b.snap_mit_cap,   m.cap)   AS snap_mit_cap,
+                COALESCE(b.snap_mit_citta, m.citta) AS snap_mit_citta,
+                COALESCE(b.snap_mit_prov,  m.prov)  AS snap_mit_prov,
+                COALESCE(b.snap_mit_piva,  m.piva)  AS snap_mit_piva,
+                COALESCE(b.snap_mit_cf,    m.cf)    AS snap_mit_cf,
+                COALESCE(b.snap_mit_tel,   m.tel)   AS snap_mit_tel,
+                COALESCE(b.snap_mit_email, m.email) AS snap_mit_email,
+                b.mittente_override
          FROM bolle b
          LEFT JOIN clienti c ON b.cliente_id = c.id
+         LEFT JOIN mittenti m ON b.mittente_id = m.id
          WHERE b.id = ?1",
     )?;
     let mut b = stmt.query_row([id], |r| {
+        // ── Destinatario (cliente) ──
         let cliente_id: Option<i64> = r.get(8)?;
-        let cliente = if let Some(cid) = cliente_id {
+        let snap_nome: Option<String> = r.get(9)?;
+        let cliente = if cliente_id.is_some() || snap_nome.is_some() {
             Some(ClienteDDT {
-                id: cid,
-                nome:  r.get(9)?,
+                id:    cliente_id.unwrap_or(0),
+                nome:  snap_nome.unwrap_or_default(),
                 sub:   r.get(10)?,
                 via:   r.get(11)?,
                 cap:   r.get(12)?,
@@ -460,6 +588,41 @@ fn load_bolla(conn: &Connection, id: i64) -> rusqlite::Result<Bolla> {
         } else {
             None
         };
+
+        // ── Mittente ──
+        let mittente_id: Option<i64> = r.get(18)?;
+        let snap_mit_nome: Option<String> = r.get(19)?;
+        let mittente = if mittente_id.is_some() || snap_mit_nome.is_some() {
+            Some(MittenteDDT {
+                id:    mittente_id.unwrap_or(0),
+                nome:  snap_mit_nome.unwrap_or_default(),
+                via:   r.get(20)?,
+                cap:   r.get(21)?,
+                citta: r.get(22)?,
+                prov:  r.get(23)?,
+                piva:  r.get(24)?,
+                cf:    r.get(25)?,
+                tel:   r.get(26)?,
+                email: r.get(27)?,
+            })
+        } else {
+            // Backward compat: try to read old mittente_override JSON
+            r.get::<_, Option<String>>(28)?
+                .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+                .map(|v| MittenteDDT {
+                    id:    0,
+                    nome:  v["nome"].as_str().unwrap_or("").to_string(),
+                    via:   v["via"].as_str().map(str::to_string),
+                    cap:   v["cap"].as_str().map(str::to_string),
+                    citta: v["citta"].as_str().map(str::to_string),
+                    prov:  v["prov"].as_str().map(str::to_string),
+                    piva:  v["piva"].as_str().map(str::to_string),
+                    cf:    v["cf"].as_str().map(str::to_string),
+                    tel:   v["tel"].as_str().map(str::to_string),
+                    email: v["email"].as_str().map(str::to_string),
+                })
+        };
+
         Ok(Bolla {
             id: r.get(0)?,
             progressive_number: r.get(1)?,
@@ -471,6 +634,8 @@ fn load_bolla(conn: &Connection, id: i64) -> rusqlite::Result<Bolla> {
             state: r.get(7)?,
             cliente_id,
             cliente,
+            mittente_id,
+            mittente,
             righe: vec![],
             total_kg: 0.0,
             total_revenue: 0.0,
@@ -480,6 +645,72 @@ fn load_bolla(conn: &Connection, id: i64) -> rusqlite::Result<Bolla> {
     b.total_kg = b.righe.iter().map(|r| r.kg).sum();
     b.total_revenue = b.righe.iter().filter_map(|r| r.revenue).sum();
     Ok(b)
+}
+
+// ─────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────
+
+type ClienteSnap = (
+    Option<String>, Option<String>, Option<String>, Option<String>, Option<String>,
+    Option<String>, Option<String>, Option<String>, Option<String>,
+);
+
+/// Recupera i dati anagrafici del cliente per salvarli come snapshot nella bolla.
+/// Restituisce (nome, sub, via, cap, citta, prov, piva, tel, sdi).
+fn fetch_cliente_snap(conn: &Connection, cliente_id: Option<i64>) -> ClienteSnap {
+    let Some(cid) = cliente_id else {
+        return (None, None, None, None, None, None, None, None, None);
+    };
+    conn.query_row(
+        "SELECT nome, sub, via, cap, citta, prov, piva, tel, sdi FROM clienti WHERE id = ?1",
+        [cid],
+        |r| {
+            Ok((
+                Some(r.get::<_, String>(0)?),
+                r.get::<_, Option<String>>(1)?,
+                r.get::<_, Option<String>>(2)?,
+                r.get::<_, Option<String>>(3)?,
+                r.get::<_, Option<String>>(4)?,
+                r.get::<_, Option<String>>(5)?,
+                r.get::<_, Option<String>>(6)?,
+                r.get::<_, Option<String>>(7)?,
+                r.get::<_, Option<String>>(8)?,
+            ))
+        },
+    )
+    .unwrap_or((None, None, None, None, None, None, None, None, None))
+}
+
+type MittenteSnap = (
+    Option<String>, Option<String>, Option<String>, Option<String>, Option<String>,
+    Option<String>, Option<String>, Option<String>, Option<String>,
+);
+
+/// Recupera i dati del mittente per salvarli come snapshot nella bolla.
+/// Restituisce (nome, via, cap, citta, prov, piva, cf, tel, email).
+fn fetch_mittente_snap(conn: &Connection, mittente_id: Option<i64>) -> MittenteSnap {
+    let Some(mid) = mittente_id else {
+        return (None, None, None, None, None, None, None, None, None);
+    };
+    conn.query_row(
+        "SELECT nome, via, cap, citta, prov, piva, cf, tel, email FROM mittenti WHERE id = ?1",
+        [mid],
+        |r| {
+            Ok((
+                Some(r.get::<_, String>(0)?),
+                r.get::<_, Option<String>>(1)?,
+                r.get::<_, Option<String>>(2)?,
+                r.get::<_, Option<String>>(3)?,
+                r.get::<_, Option<String>>(4)?,
+                r.get::<_, Option<String>>(5)?,
+                r.get::<_, Option<String>>(6)?,
+                r.get::<_, Option<String>>(7)?,
+                r.get::<_, Option<String>>(8)?,
+            ))
+        },
+    )
+    .unwrap_or((None, None, None, None, None, None, None, None, None))
 }
 
 // ─────────────────────────────────────────────
@@ -532,16 +763,36 @@ mod commands {
             )
             .map_err(|e| e.to_string())?;
 
+        // Snapshot destinatario
+        let (snap_nome, snap_sub, snap_via, snap_cap, snap_citta, snap_prov, snap_piva, snap_tel, snap_sdi) =
+            fetch_cliente_snap(&conn, payload.cliente_id);
+
+        // Snapshot mittente
+        let (snap_mit_nome, snap_mit_via, snap_mit_cap, snap_mit_citta, snap_mit_prov,
+             snap_mit_piva, snap_mit_cf, snap_mit_tel, snap_mit_email) =
+            fetch_mittente_snap(&conn, payload.mittente_id);
+
         conn.execute(
             "INSERT INTO bolle
-                (progressive_number, emission_date, pickup_datetime, notes, state, cliente_id)
-             VALUES (?1, ?2, ?3, ?4, 'NON_STAMPATA', ?5)",
+                (progressive_number, emission_date, pickup_datetime, notes, state, cliente_id,
+                 snap_nome, snap_sub, snap_via, snap_cap, snap_citta, snap_prov, snap_piva, snap_tel, snap_sdi,
+                 mittente_id,
+                 snap_mit_nome, snap_mit_via, snap_mit_cap, snap_mit_citta, snap_mit_prov,
+                 snap_mit_piva, snap_mit_cf, snap_mit_tel, snap_mit_email)
+             VALUES (?1, ?2, ?3, ?4, 'NON_STAMPATA', ?5,
+                     ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
+                     ?15,
+                     ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
             params![
                 max_num + 1,
                 now,
                 payload.pickup_datetime,
                 payload.notes,
-                payload.cliente_id
+                payload.cliente_id,
+                snap_nome, snap_sub, snap_via, snap_cap, snap_citta, snap_prov, snap_piva, snap_tel, snap_sdi,
+                payload.mittente_id,
+                snap_mit_nome, snap_mit_via, snap_mit_cap, snap_mit_citta, snap_mit_prov,
+                snap_mit_piva, snap_mit_cf, snap_mit_tel, snap_mit_email,
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -569,9 +820,32 @@ mod commands {
         }
         let conn = state.0.lock().map_err(|e| e.to_string())?;
 
+        // Snapshot destinatario
+        let (snap_nome, snap_sub, snap_via, snap_cap, snap_citta, snap_prov, snap_piva, snap_tel, snap_sdi) =
+            fetch_cliente_snap(&conn, payload.cliente_id);
+
+        // Snapshot mittente
+        let (snap_mit_nome, snap_mit_via, snap_mit_cap, snap_mit_citta, snap_mit_prov,
+             snap_mit_piva, snap_mit_cf, snap_mit_tel, snap_mit_email) =
+            fetch_mittente_snap(&conn, payload.mittente_id);
+
         conn.execute(
-            "UPDATE bolle SET pickup_datetime = ?1, notes = ?2, cliente_id = ?3 WHERE id = ?4",
-            params![payload.pickup_datetime, payload.notes, payload.cliente_id, id],
+            "UPDATE bolle SET pickup_datetime = ?1, notes = ?2, cliente_id = ?3,
+             snap_nome = ?4, snap_sub = ?5, snap_via = ?6, snap_cap = ?7, snap_citta = ?8,
+             snap_prov = ?9, snap_piva = ?10, snap_tel = ?11, snap_sdi = ?12,
+             mittente_id = ?13,
+             snap_mit_nome = ?14, snap_mit_via = ?15, snap_mit_cap = ?16, snap_mit_citta = ?17,
+             snap_mit_prov = ?18, snap_mit_piva = ?19, snap_mit_cf = ?20, snap_mit_tel = ?21,
+             snap_mit_email = ?22
+             WHERE id = ?23",
+            params![
+                payload.pickup_datetime, payload.notes, payload.cliente_id,
+                snap_nome, snap_sub, snap_via, snap_cap, snap_citta, snap_prov, snap_piva, snap_tel, snap_sdi,
+                payload.mittente_id,
+                snap_mit_nome, snap_mit_via, snap_mit_cap, snap_mit_citta, snap_mit_prov,
+                snap_mit_piva, snap_mit_cf, snap_mit_tel, snap_mit_email,
+                id,
+            ],
         )
         .map_err(|e| e.to_string())?;
 
@@ -1185,6 +1459,107 @@ mod commands {
         Ok(())
     }
 
+    // ── Mittenti ────────────────────────────────────
+
+    #[tauri::command]
+    pub fn get_mittenti(state: State<DbState>) -> Result<Vec<Mittente>, String> {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, nome, via, cap, citta, prov, piva, cf, tel, email, predefinito, attivo
+                 FROM mittenti WHERE attivo = 1 ORDER BY predefinito DESC, nome",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |r| {
+                Ok(Mittente {
+                    id:          r.get(0)?,
+                    nome:        r.get(1)?,
+                    via:         r.get(2)?,
+                    cap:         r.get(3)?,
+                    citta:       r.get(4)?,
+                    prov:        r.get(5)?,
+                    piva:        r.get(6)?,
+                    cf:          r.get(7)?,
+                    tel:         r.get(8)?,
+                    email:       r.get(9)?,
+                    predefinito: r.get(10)?,
+                    attivo:      r.get(11)?,
+                })
+            })
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(rows)
+    }
+
+    #[tauri::command]
+    pub fn create_mittente(
+        state: State<DbState>,
+        payload: MittentePayload,
+    ) -> Result<i64, String> {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        conn.execute(
+            "INSERT INTO mittenti (nome, via, cap, citta, prov, piva, cf, tel, email)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                payload.nome, payload.via, payload.cap, payload.citta,
+                payload.prov, payload.piva, payload.cf, payload.tel, payload.email
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    #[tauri::command]
+    pub fn update_mittente(
+        state: State<DbState>,
+        id: i64,
+        payload: MittentePayload,
+    ) -> Result<(), String> {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE mittenti SET nome=?1, via=?2, cap=?3, citta=?4,
+             prov=?5, piva=?6, cf=?7, tel=?8, email=?9 WHERE id=?10",
+            params![
+                payload.nome, payload.via, payload.cap, payload.citta,
+                payload.prov, payload.piva, payload.cf, payload.tel, payload.email, id
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    #[tauri::command]
+    pub fn delete_mittente(state: State<DbState>, id: i64) -> Result<(), String> {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM bolle WHERE mittente_id = ?1",
+                [id],
+                |r| r.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        if count > 0 {
+            conn.execute("UPDATE mittenti SET attivo = 0 WHERE id = ?1", [id])
+                .map_err(|e| e.to_string())?;
+        } else {
+            conn.execute("DELETE FROM mittenti WHERE id = ?1", [id])
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+
+    #[tauri::command]
+    pub fn set_mittente_predefinito(state: State<DbState>, id: i64) -> Result<(), String> {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        conn.execute("UPDATE mittenti SET predefinito = 0", [])
+            .map_err(|e| e.to_string())?;
+        conn.execute("UPDATE mittenti SET predefinito = 1 WHERE id = ?1", [id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     // ── Yearly Stats ────────────────────────────────
 
     #[tauri::command]
@@ -1448,6 +1823,11 @@ pub fn run() {
             commands::update_cliente,
             commands::delete_cliente,
             commands::set_cliente_predefinito,
+            commands::get_mittenti,
+            commands::create_mittente,
+            commands::update_mittente,
+            commands::delete_mittente,
+            commands::set_mittente_predefinito,
             commands::get_yearly_stats,
             commands::get_giornale,
             commands::create_giornale_entry,

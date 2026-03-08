@@ -1,15 +1,14 @@
 import { Link, useLocation } from "react-router-dom";
-import { List, Plus, BarChart2, Users, Wallet, LayoutDashboard, Building2, BookOpen } from "lucide-react";
+import { List, Plus, Settings2, BookOpen, Users, Wallet, LayoutDashboard } from "lucide-react";
 
 const links = [
-  { to: "/", label: "Elenco Bolle", icon: List },
-  { to: "/nuova", label: "Nuova Bolla", icon: Plus },
-  { to: "/report", label: "Report Vendite", icon: BarChart2 },
-  { to: "/dipendenti", label: "Dipendenti", icon: Users },
-  { to: "/costi", label: "Costi", icon: Wallet },
-  { to: "/giornale", label: "Giornale", icon: BookOpen },
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/clienti", label: "Clienti", icon: Building2 },
+  { to: "/",                   label: "Elenco Bolle",  icon: List },
+  { to: "/nuova",              label: "Nuova Bolla",   icon: Plus },
+  { to: "/impostazioni-bolla", label: "Impostazioni",  icon: Settings2 },
+  { to: "/giornale",           label: "Giornale",      icon: BookOpen },
+  { to: "/dipendenti",         label: "Dipendenti",    icon: Users },
+  { to: "/costi",              label: "Costi",         icon: Wallet },
+  { to: "/dashboard",          label: "Dashboard",     icon: LayoutDashboard },
 ];
 
 export default function Navbar() {

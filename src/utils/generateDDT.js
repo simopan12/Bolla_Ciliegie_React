@@ -91,12 +91,18 @@ function isSpecial(variety) {
 // Contenuto DDT
 // ─────────────────────────────────────────────
 function buildContent(bolla) {
-  const MITTENTE = getMittente();
-  // Se la bolla ha un cliente con almeno nome e via compilati, usa quelli;
-  // altrimenti fallback ai dati di localStorage.
+  // Mittente: usa snap DB se presente, altrimenti fallback localStorage (vecchie bolle)
+  const m = bolla.mittente;
+  const mitDefault = getMittente();
+  const MITTENTE = m
+    ? { nome: m.nome ?? "", via: m.via ?? "", cap: m.cap ?? "", citta: m.citta ?? "",
+        prov: m.prov ?? "", piva: m.piva ?? "", cf: m.cf ?? "", tel: m.tel ?? "", email: m.email ?? "" }
+    : mitDefault;
+
+  // Destinatario: usa snap dal cliente selezionato; fallback alle impostazioni globali
   const c = bolla.cliente;
-  const DESTINATARIO = (c && c.nome && c.via)
-    ? { nome: c.nome, sub: c.sub ?? "", via: c.via, cap: c.cap ?? "", citta: c.citta ?? "", prov: c.prov ?? "", piva: c.piva ?? "", tel: c.tel ?? "", sdi: c.sdi ?? "" }
+  const DESTINATARIO = (c && c.nome)
+    ? { nome: c.nome, sub: c.sub ?? "", via: c.via ?? "", cap: c.cap ?? "", citta: c.citta ?? "", prov: c.prov ?? "", piva: c.piva ?? "", tel: c.tel ?? "", sdi: c.sdi ?? "" }
     : getDestinatario();
 
   const righe = bolla.righe || [];
